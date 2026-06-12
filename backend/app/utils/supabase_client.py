@@ -14,9 +14,25 @@ from supabase import create_client, Client
 from app.config import settings
 
 
+import supabase._sync.client
+
 def _get_client() -> Client:
     """Create a Supabase client using the service role key (full access)."""
-    return create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY)
+    # Supabase recently introduced opaque API keys starting with 'sb_'.
+    # However, the python client strictly enforces that keys must be JWTs.
+    # We temporarily monkey-patch re.match to bypass this regex check.
+    original_match = supabase._sync.client.re.match
+    
+    def patched_match(pattern, string, flags=0):
+        if pattern == r"^[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.?[A-Za-z0-9-_.+/=]*$":
+            return True
+        return original_match(pattern, string, flags)
+        
+    supabase._sync.client.re.match = patched_match
+    try:
+        return create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY)
+    finally:
+        supabase._sync.client.re.match = original_match
 
 
 def upload_file(
