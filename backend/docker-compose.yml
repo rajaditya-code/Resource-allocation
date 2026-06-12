@@ -1,0 +1,44 @@
+version: "3.9"
+
+services:
+  # ── FastAPI Application ──
+  api:
+    build: .
+    container_name: asset-mgmt-api
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/asset_mgmt
+      - JWT_SECRET_KEY=dev-secret-change-in-production
+      - JWT_REFRESH_SECRET_KEY=dev-refresh-secret-change-in-production
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - DEBUG=true
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ── PostgreSQL Database ──
+  db:
+    image: postgres:16-alpine
+    container_name: asset-mgmt-db
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: asset_mgmt
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
